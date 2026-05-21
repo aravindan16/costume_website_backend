@@ -151,27 +151,24 @@ def verify_admin(email: Optional[str], password: Optional[str]):
 @app.on_event("startup")
 async def startup():
     global client, db
-    if not MONGODB_URI:
-        raise Exception("MONGODB_URI is not set in environment variables.")
-    client = AsyncIOMotorClient(MONGODB_URI)
-    db = client[MONGODB_DB]
-    if await db.products.count_documents({}) == 0:
-        await db.products.insert_many(SAMPLE_PRODUCTS)
-        
-    admin_email_lower = ADMIN_EMAIL.lower()
-    admin_user = await db.users.find_one({"email": admin_email_lower})
-    if not admin_user:
-        await db.users.insert_one({
-            "name": "Nilla Sarres Admin",
-            "email": admin_email_lower,
-            "phone": "",
-            "password": ADMIN_PASSWORD,
-            "role": "admin",
-            "created_at": datetime.now(timezone.utc)
-        })
-    else:
-        await db.users.update_one({"email": admin_email_lower}, {"$set": {"password": ADMIN_PASSWORD, "role": "admin"}})
 
+    if not MONGODB_URI:
+        print("MongoDB URI not found. Using memory mode.")
+        return
+
+    try:
+        client = AsyncIOMotorClient(MONGODB_URI)
+        db = client[MONGODB_DB]
+
+        await client.admin.command("ping")
+        print("MongoDB connected successfully")
+
+        if await db.products.count_documents({}) == 0:
+            await db.products.insert_many(SAMPLE_PRODUCTS)
+
+    except Exception as e:
+        print("MongoDB connection failed:", str(e))
+        db = None
 
 @app.on_event("shutdown")
 async def shutdown():
