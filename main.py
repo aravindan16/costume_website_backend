@@ -80,10 +80,6 @@ SAMPLE_PRODUCTS = [
     },
 ]
 
-memory_products = [product.copy() for product in SAMPLE_PRODUCTS]
-memory_users = []
-
-
 class Product(BaseModel):
     id: str
     name: str
@@ -155,11 +151,26 @@ def verify_admin(email: Optional[str], password: Optional[str]):
 @app.on_event("startup")
 async def startup():
     global client, db
-    if MONGODB_URI:
-        client = AsyncIOMotorClient(MONGODB_URI)
-        db = client[MONGODB_DB]
-        if await db.products.count_documents({}) == 0:
-            await db.products.insert_many(SAMPLE_PRODUCTS)
+    if not MONGODB_URI:
+        raise Exception("MONGODB_URI is not set in environment variables.")
+    client = AsyncIOMotorClient(MONGODB_URI)
+    db = client[MONGODB_DB]
+    if await db.products.count_documents({}) == 0:
+        await db.products.insert_many(SAMPLE_PRODUCTS)
+        
+    admin_email_lower = ADMIN_EMAIL.lower()
+    admin_user = await db.users.find_one({"email": admin_email_lower})
+    if not admin_user:
+        await db.users.insert_one({
+            "name": "Nilla Sarres Admin",
+            "email": admin_email_lower,
+            "phone": "",
+            "password": ADMIN_PASSWORD,
+            "role": "admin",
+            "created_at": datetime.now(timezone.utc)
+        })
+    else:
+        await db.users.update_one({"email": admin_email_lower}, {"$set": {"password": ADMIN_PASSWORD, "role": "admin"}})
 
 
 @app.on_event("shutdown")
@@ -170,14 +181,11 @@ async def shutdown():
 
 @app.get("/api/health")
 async def health():
-    return {"ok": True, "database": "mongodb" if db is not None else "memory"}
+    return {"ok": True, "database": "mongodb"}
 
 
 @app.get("/api/products", response_model=List[Product])
 async def get_products():
-    if db is None:
-        return memory_products
-
     documents = await db.products.find({}).sort("name", 1).to_list(length=100)
     return [serialize_product(document) for document in documents]
 
@@ -196,12 +204,6 @@ async def signup(account: SignupRequest):
     if user["email"] == ADMIN_EMAIL.lower():
         raise HTTPException(status_code=400, detail="This email is reserved for admin.")
 
-    if db is None:
-        if any(existing["email"] == user["email"] for existing in memory_users):
-            raise HTTPException(status_code=400, detail="Account already exists.")
-        memory_users.append(user)
-        return public_account(user)
-
     if await db.users.find_one({"email": user["email"]}):
         raise HTTPException(status_code=400, detail="Account already exists.")
     await db.users.insert_one(user)
@@ -211,27 +213,6 @@ async def signup(account: SignupRequest):
 @app.post("/api/auth/login")
 async def login(credentials: LoginRequest):
     email = credentials.email.lower()
-
-    if email == ADMIN_EMAIL.lower() and credentials.password == ADMIN_PASSWORD:
-        return {
-            "name": "Nilla Sarres Admin",
-            "email": ADMIN_EMAIL,
-            "phone": "",
-            "role": "admin",
-        }
-
-    if db is None:
-        user = next(
-            (
-                existing
-                for existing in memory_users
-                if existing["email"] == email and existing["password"] == credentials.password
-            ),
-            None,
-        )
-        if not user:
-            raise HTTPException(status_code=401, detail="Invalid email or password.")
-        return public_account(user)
 
     user = await db.users.find_one({"email": email, "password": credentials.password})
     if not user:
@@ -297,10 +278,6 @@ async def create_product_with_image(
         description=description,
     )
 
-    if db is None:
-        memory_products.insert(0, product.model_dump())
-        return product
-
     await db.products.insert_one(product.model_dump())
     return product
 
@@ -321,11 +298,7 @@ async def update_product_with_image(
 ):
     verify_admin(x_admin_email, x_admin_password)
 
-    existing = None
-    if db is None:
-        existing = next((product for product in memory_products if product["id"] == product_id), None)
-    else:
-        existing = await db.products.find_one({"id": product_id})
+    existing = await db.products.find_one({"id": product_id})
 
     if not existing:
         raise HTTPException(status_code=404, detail="Saree not found.")
@@ -362,13 +335,6 @@ async def update_product_with_image(
         description=description,
     )
 
-    if db is None:
-        for index, item in enumerate(memory_products):
-            if item["id"] == product_id:
-                memory_products[index] = product.model_dump()
-                break
-        return product
-
     await db.products.update_one({"id": product_id}, {"$set": product.model_dump()})
     return product
 @app.delete("/api/admin/products/{product_id}")
@@ -378,14 +344,6 @@ async def delete_product(
     x_admin_password: Optional[str] = Header(default=None),
 ):
     verify_admin(x_admin_email, x_admin_password)
-
-    if db is None:
-        global memory_products
-        initial_len = len(memory_products)
-        memory_products = [product for product in memory_products if product["id"] != product_id]
-        if len(memory_products) == initial_len:
-            raise HTTPException(status_code=404, detail="Saree not found.")
-        return {"ok": True, "message": "Saree deleted successfully."}
 
     result = await db.products.delete_one({"id": product_id})
     if result.deleted_count == 0:
@@ -398,9 +356,6 @@ async def create_order(order: Order):
     order_data = order.model_dump()
     order_data["created_at"] = datetime.now(timezone.utc)
     order_data["status"] = "new"
-
-    if db is None:
-        return {"ok": True, "mode": "memory", "message": "Order accepted locally for demo."}
 
     result = await db.orders.insert_one(order_data)
     return {"ok": True, "order_id": str(result.inserted_id)}
