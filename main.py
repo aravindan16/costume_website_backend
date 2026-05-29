@@ -22,7 +22,7 @@ ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "NillaAdmin@123")
 UPLOAD_DIR = Path(__file__).parent / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
 
-app = FastAPI(title="Nilla Sarres API")
+app = FastAPI(title="Nilavalayam API")
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 app.add_middleware(

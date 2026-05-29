@@ -21,7 +21,7 @@ async def startup():
     admin_user = await db.users.find_one({"email": admin_email_lower})
     if not admin_user:
         await db.users.insert_one({
-            "name": "Nilla Sarres Admin",
+            "name": "Nilavalayam Admin",
             "email": admin_email_lower,
             "phone": "",
             "password": ADMIN_PASSWORD,
