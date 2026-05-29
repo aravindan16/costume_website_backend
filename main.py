@@ -27,7 +27,12 @@ app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[FRONTEND_ORIGIN, "http://127.0.0.1:5173"],
+    allow_origins=[
+        FRONTEND_ORIGIN,
+        "http://127.0.0.1:5173",
+        "https://nilavalayam.onrender.com",
+        "https://costume-website-frontend.onrender.com"
+    ],
     allow_origin_regex=r"http://(localhost|127\.0\.0\.1):\d+",
     allow_credentials=True,
     allow_methods=["*"],
