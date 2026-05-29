@@ -157,6 +157,9 @@ def verify_admin(email: Optional[str], password: Optional[str]):
 async def startup():
     global client, db
 
+    print("Using DB:", MONGODB_DB)
+    print("Mongo URI exists:", bool(MONGODB_URI))
+
     if not MONGODB_URI:
         print("MongoDB URI not found. Using memory mode.")
         return
@@ -188,7 +191,13 @@ async def health():
 
 @app.get("/api/products", response_model=List[Product])
 async def get_products():
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database not connected")
+
     documents = await db.products.find({}).sort("name", 1).to_list(length=100)
+
+    print("Products found:", len(documents))
+
     return [serialize_product(document) for document in documents]
 
 
