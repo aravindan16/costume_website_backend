@@ -31,7 +31,8 @@ app.add_middleware(
         FRONTEND_ORIGIN,
         "http://127.0.0.1:5173",
         "https://nilavalayam.onrender.com",
-        "https://costume-website-frontend.onrender.com"
+        "https://costume-website-frontend.onrender.com",
+        "https://nilavalayam.rf.gd",
     ],
     allow_origin_regex=r"http://(localhost|127\.0\.0\.1):\d+",
     allow_credentials=True,
