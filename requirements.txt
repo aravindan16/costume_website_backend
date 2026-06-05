@@ -3,5 +3,6 @@ uvicorn[standard]==0.34.0
 motor==3.6.0
 python-dotenv==1.0.1
 pydantic==2.9.2
-python-multipart==0.0.20google-auth
-requests
+python-multipart==0.0.20
+google-auth==2.39.0
+requests==2.32.3
