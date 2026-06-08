@@ -57,6 +57,10 @@ async def login(credentials: LoginRequest):
         
     return public_account(user)
 
+@router.post("/auth/logout")
+async def logout():
+    return {"message": "Logged out successfully"}
+
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 from app.core.config import GOOGLE_CLIENT_ID
